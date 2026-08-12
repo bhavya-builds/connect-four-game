@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connect Four</title>
+<style>
+  :root {
+    --wood: #2b1d14;
+    --wood-light: #4a3222;
+    --board: #1c3f5e;
+    --board-light: #2a577f;
+    --slot: #0f2537;
+    --p1: #e8543e;
+    --p1-dark: #b83a28;
+    --p2: #f2c14e;
+    --p2-dark: #c99a2e;
+    --cream: #f4ede1;
+    --ink: #1a1410;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at top, #3a2a1c 0%, #17110b 70%);
+    font-family: 'Georgia', 'Times New Roman', serif;
+    color: var(--cream);
+    padding: 24px 12px;
+  }
+
+  h1 {
+    font-size: clamp(28px, 5vw, 44px);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin: 0 0 4px;
+    font-weight: 700;
+    text-shadow: 0 2px 0 rgba(0,0,0,0.4);
+  }
+
+  .subtitle {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 12px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    opacity: 0.55;
+    margin-bottom: 22px;
+  }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    min-height: 30px;
+    transition: opacity 0.2s ease;
+  }
+
+  .status-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    box-shadow: inset 0 -3px 4px rgba(0,0,0,0.35), 0 0 8px rgba(0,0,0,0.4);
+  }
+
+  .status-dot.p1 { background: radial-gradient(circle at 35% 30%, #ff8368, var(--p1) 60%, var(--p1-dark)); }
+  .status-dot.p2 { background: radial-gradient(circle at 35% 30%, #ffe08a, var(--p2) 60%, var(--p2-dark)); }
+
+  .board-wrap {
+    background: linear-gradient(160deg, var(--wood-light), var(--wood));
+    padding: 16px;
+    border-radius: 18px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.55), inset 0 2px 0 rgba(255,255,255,0.06);
+  }
+
+  .columns-hint {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(36px, 62px));
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .col-btn {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--cream);
+    background: rgba(255,255,255,0.05);
+    border: none;
+    border-radius: 8px;
+    padding: 6px 0;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+  }
+
+  .col-btn:hover:not(:disabled) { background: rgba(255,255,255,0.16); }
+  .col-btn:active:not(:disabled) { transform: translateY(1px); }
+  .col-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(36px, 62px));
+    grid-template-rows: repeat(6, minmax(36px, 62px));
+    gap: 6px;
+    background: linear-gradient(160deg, var(--board-light), var(--board));
+    padding: 10px;
+    border-radius: 12px;
+  }
+
+  .cell {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: var(--slot);
+    border-radius: 50%;
+    box-shadow: inset 0 3px 6px rgba(0,0,0,0.6);
+    overflow: hidden;
+  }
+
+  .disc {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    transform: translateY(-320%);
+    opacity: 0;
+  }
+
+  .disc.drop {
+    animation: dropIn 0.42s cubic-bezier(.5,0,.75,.9) forwards;
+  }
+
+  .disc.p1 { background: radial-gradient(circle at 35% 28%, #ff8368, var(--p1) 55%, var(--p1-dark)); box-shadow: inset 0 -4px 6px rgba(0,0,0,0.3); }
+  .disc.p2 { background: radial-gradient(circle at 35% 28%, #ffe08a, var(--p2) 55%, var(--p2-dark)); box-shadow: inset 0 -4px 6px rgba(0,0,0,0.3); }
+
+  .disc.win {
+    animation: dropIn 0.42s cubic-bezier(.5,0,.75,.9) forwards, pulse 0.9s ease-in-out 0.5s infinite;
+  }
+
+  @keyframes dropIn {
+    0% { transform: translateY(-320%); opacity: 1; }
+    70% { transform: translateY(6%); }
+    85% { transform: translateY(-3%); }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+
+  @keyframes pulse {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.35); }
+  }
+
+  .controls {
+    margin-top: 20px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  #restart-btn {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: var(--cream);
+    border: none;
+    padding: 12px 26px;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 6px 0 #b8a98d, 0 8px 14px rgba(0,0,0,0.4);
+    transition: transform 0.08s ease, box-shadow 0.08s ease;
+  }
+
+  #restart-btn:hover { filter: brightness(1.03); }
+  #restart-btn:active {
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 #b8a98d, 0 4px 8px rgba(0,0,0,0.4);
+  }
+
+  .msg {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 13px;
+    opacity: 0.5;
+    margin-top: 14px;
+    text-align: center;
+    max-width: 420px;
+  }
+
+  @media (max-width: 480px) {
+    .board, .columns-hint { grid-template-columns: repeat(7, minmax(30px, 1fr)); }
+  }
+</style>
+</head>
+<body>
+
+  <h1>Connect Four</h1>
+  <div class="subtitle">Two Players · Same Device</div>
+
+  <div class="status-bar" id="status-bar">
+    <span class="status-dot p1" id="status-dot"></span>
+    <span id="status-text">Player 1's Turn</span>
+  </div>
+
+  <div class="board-wrap">
+    <div class="columns-hint" id="columns-hint"></div>
+    <div class="board" id="board"></div>
+  </div>
+
+  <div class="controls">
+    <button id="restart-btn">New Game</button>
+  </div>
+
+  <p class="msg">Click a column arrow, or click directly on the board column, to drop your piece.</p>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Game constants ----------
+  const ROWS = 6;
+  const COLS = 7;
+  const EMPTY = 0;
+  const PLAYER1 = 1;
+  const PLAYER2 = 2;
+
+  // ---------- Game state (pure logic, no DOM references) ----------
+  const GameState = {
+    board: [],      // board[row][col] -> EMPTY | PLAYER1 | PLAYER2, row 0 = top
+    currentPlayer: PLAYER1,
+    gameOver: false,
+    winningCells: [] // [{row, col}, ...] filled in on a win
+  };
+
+  function createEmptyBoard() {
+    return Array.from({ length: ROWS }, () => Array(COLS).fill(EMPTY));
+  }
+
+  function resetGame() {
+    GameState.board = createEmptyBoard();
+    GameState.currentPlayer = PLAYER1;
+    GameState.gameOver = false;
+    GameState.winningCells = [];
+  }
+
+  // Returns the row index a piece would land in for a given column, or -1 if full.
+  function getLowestEmptyRow(board, col) {
+    for (let row = ROWS - 1; row >= 0; row--) {
+      if (board[row][col] === EMPTY) return row;
+    }
+    return -1;
+  }
+
+  function isColumnFull(board, col) {
+    return getLowestEmptyRow(board, col) === -1;
+  }
+
+  function isBoardFull(board) {
+    for (let c = 0; c < COLS; c++) {
+      if (!isColumnFull(board, c)) return false;
+    }
+    return true;
+  }
+
+  // Algorithmic win check: from the last placed piece, walk outward along
+  // each of the 4 axes (horizontal, vertical, both diagonals) in both
+  // directions and count consecutive same-player pieces.
+  function checkWin(board, row, col, player) {
+    const directions = [
+      { dr: 0, dc: 1 },  // horizontal
+      { dr: 1, dc: 0 },  // vertical
+      { dr: 1, dc: 1 },  // diagonal down-right
+      { dr: 1, dc: -1 }  // diagonal down-left
+    ];
+
+    for (const { dr, dc } of directions) {
+      const cells = [{ row, col }];
+
+      // walk forward
+      let r = row + dr, c = col + dc;
+      while (r >= 0 && r < ROWS && c >= 0 && c < COLS && board[r][c] === player) {
+        cells.push({ row: r, col: c });
+        r += dr; c += dc;
+      }
+      // walk backward
+      r = row - dr; c = col - dc;
+      while (r >= 0 && r < ROWS && c >= 0 && c < COLS && board[r][c] === player) {
+        cells.push({ row: r, col: c });
+        r -= dr; c -= dc;
+      }
+
+      if (cells.length >= 4) {
+        return cells;
+      }
+    }
+    return null;
+  }
+
+  // Attempts to drop a piece in `col` for the current player.
+  // Returns a result object describing what happened, without touching the DOM.
+  function dropPiece(col) {
+    if (GameState.gameOver) return { ok: false, reason: "game-over" };
+    const row = getLowestEmptyRow(GameState.board, col);
+    if (row === -1) return { ok: false, reason: "column-full" };
+
+    const player = GameState.currentPlayer;
+    GameState.board[row][col] = player;
+
+    const winCells = checkWin(GameState.board, row, col, player);
+    if (winCells) {
+      GameState.gameOver = true;
+      GameState.winningCells = winCells;
+      return { ok: true, row, col, player, result: "win", winCells };
+    }
+
+    if (isBoardFull(GameState.board)) {
+      GameState.gameOver = true;
+      return { ok: true, row, col, player, result: "draw" };
+    }
+
+    GameState.currentPlayer = player === PLAYER1 ? PLAYER2 : PLAYER1;
+    return { ok: true, row, col, player, result: "continue" };
+  }
+
+  // ---------- DOM / rendering layer ----------
+  const boardEl = document.getElementById("board");
+  const columnsHintEl = document.getElementById("columns-hint");
+  const statusTextEl = document.getElementById("status-text");
+  const statusDotEl = document.getElementById("status-dot");
+  const restartBtn = document.getElementById("restart-btn");
+
+  let cellEls = []; // cellEls[row][col] -> DOM element
+
+  function buildBoardDOM() {
+    boardEl.innerHTML = "";
+    columnsHintEl.innerHTML = "";
+    cellEls = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+
+    for (let c = 0; c < COLS; c++) {
+      const btn = document.createElement("button");
+      btn.className = "col-btn";
+      btn.textContent = "▼";
+      btn.setAttribute("aria-label", "Drop piece in column " + (c + 1));
+      btn.addEventListener("click", () => handleColumnClick(c));
+      columnsHintEl.appendChild(btn);
+    }
+
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        cell.dataset.row = r;
+        cell.dataset.col = c;
+        cell.addEventListener("click", () => handleColumnClick(c));
+        boardEl.appendChild(cell);
+        cellEls[r][c] = cell;
+      }
+    }
+  }
+
+  function updateStatus() {
+    if (GameState.gameOver) return; // result message handled separately
+    const p = GameState.currentPlayer;
+    statusDotEl.className = "status-dot " + (p === PLAYER1 ? "p1" : "p2");
+    statusTextEl.textContent = "Player " + p + "'s Turn";
+  }
+
+  function showResult(result, player) {
+    if (result === "win") {
+      statusDotEl.className = "status-dot " + (player === PLAYER1 ? "p1" : "p2");
+      statusTextEl.textContent = "Player " + player + " Wins!";
+    } else if (result === "draw") {
+      statusDotEl.style.background = "#8a8a8a";
+      statusTextEl.textContent = "It's a Draw!";
+    }
+  }
+
+  function setColumnButtonsDisabled(disabled) {
+    document.querySelectorAll(".col-btn").forEach((btn, i) => {
+      if (disabled) {
+        btn.disabled = true;
+      } else {
+        btn.disabled = isColumnFull(GameState.board, i);
+      }
+    });
+  }
+
+  function handleColumnClick(col) {
+    const res = dropPiece(col);
+    if (!res.ok) return;
+
+    const cell = cellEls[res.row][col];
+    const disc = document.createElement("div");
+    disc.className = "disc drop " + (res.player === PLAYER1 ? "p1" : "p2");
+    cell.appendChild(disc);
+
+    if (res.result === "win") {
+      res.winCells.forEach(({ row, col }) => {
+        const winDisc = cellEls[row][col].querySelector(".disc");
+        if (winDisc) winDisc.classList.add("win");
+      });
+      showResult("win", res.player);
+      setColumnButtonsDisabled(true);
+      return;
+    }
+
+    if (res.result === "draw") {
+      showResult("draw");
+      setColumnButtonsDisabled(true);
+      return;
+    }
+
+    updateStatus();
+    setColumnButtonsDisabled(false);
+  }
+
+  function startNewGame() {
+    resetGame();
+    buildBoardDOM();
+    statusDotEl.style.background = "";
+    updateStatus();
+    setColumnButtonsDisabled(false);
+  }
+
+  restartBtn.addEventListener("click", startNewGame);
+
+  // ---------- Init ----------
+  startNewGame();
+})();
+</script>
+</body>
+</html>
